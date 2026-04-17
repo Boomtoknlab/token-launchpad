@@ -1,0 +1,314 @@
+<div align="center">
+
+<img src="https://img.shields.io/badge/◈-CurvePad-00FFAA?style=for-the-badge&labelColor=080B0F&color=00FFAA" alt="CurvePad" height="42"/>
+
+# CurvePad
+
+**Permissionless bonding curve token launchpad on Base.**  
+Anyone can launch an ERC-20 in one transaction. Price is set by math, not market makers.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-00FFAA.svg?style=flat-square&labelColor=080B0F)](LICENSE)
+[![Built on Base](https://img.shields.io/badge/Built%20on-Base-0052FF?style=flat-square&labelColor=080B0F&logo=coinbase)](https://base.org)
+[![Scaffold-ETH 2](https://img.shields.io/badge/Scaffold--ETH-2-7C3AED?style=flat-square&labelColor=080B0F)](https://scaffoldeth.io)
+[![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?style=flat-square&labelColor=080B0F&logo=solidity)](https://soliditylang.org)
+[![Foundry](https://img.shields.io/badge/Foundry-Tests%20Passing-00FFAA?style=flat-square&labelColor=080B0F)](https://book.getfoundry.sh)
+[![Next.js](https://img.shields.io/badge/Next.js-15-white?style=flat-square&labelColor=080B0F&logo=nextdotjs)](https://nextjs.org)
+[![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5-4E5EE4?style=flat-square&labelColor=080B0F)](https://openzeppelin.com)
+[![Twitter](https://img.shields.io/badge/@Agunnaya001-Follow-1DA1F2?style=flat-square&labelColor=080B0F&logo=x)](https://x.com/Agunnaya001)
+[![GitHub Org](https://img.shields.io/badge/Agunnaya%20Labs-Organisation-181717?style=flat-square&labelColor=080B0F&logo=github)](https://github.com/agunnaya001)
+
+-----
+
+> **CurvePad** is a fully on-chain token launchpad where price discovery is handled by a smart contract, not a liquidity pool or market maker. Launch a token in one transaction. Earn 1% of every trade as creator fees. Forever.
+
+</div>
+
+-----
+
+## ✦ What Makes CurvePad Different
+
+|Feature                |CurvePad                   |Typical launchpad|
+|-----------------------|---------------------------|-----------------|
+|Liquidity pool required|✗ No                       |✓ Yes            |
+|Pre-sale / whitelist   |✗ No                       |✓ Often          |
+|Rug-proof reserve      |✓ Mathematically guaranteed|✗ Trust-based    |
+|Creator ongoing fees   |✓ 1% every trade, forever  |✗ One-time       |
+|Price manipulation     |✗ Not possible             |✓ Possible       |
+|Deployment cost        |~0.002 ETH                 |Varies           |
+
+-----
+
+## 📐 How the Bonding Curve Works
+
+CurvePad uses a **linear bonding curve**:
+
+```
+price(supply) = BASE_PRICE + SLOPE × supply
+```
+
+Every buy mints new tokens and pushes the price up. Every sell burns tokens and pulls the price down. The contract acts as both the token and its own automated market maker.
+
+### Reserve Integrity
+
+The ETH held in each token contract is exactly equal to the area under the price curve from 0 to the current supply:
+
+```
+reserve = ∫₀ˢ price(s) ds  =  BASE_PRICE × S  +  SLOPE × S² / 2
+```
+
+This means **every outstanding token can always be redeemed**. The reserve never runs dry. There is no fractional reserve, no admin drain function, no rug vector.
+
+### Buy Pricing (Quadratic Solution)
+
+When you send ETH to buy tokens, the contract solves for the exact number of tokens your ETH traverses on the curve:
+
+```
+(SLOPE / 2) · x²  +  B · x  −  reserve = 0
+
+where  B = BASE_PRICE + SLOPE × currentSupply
+
+discriminant = B² + 2 · SLOPE · reserve
+
+x = (√discriminant − B) / SLOPE
+```
+
+> **Precision note:** The discriminant is computed at full 256-bit precision. There is **no division before taking the square root** — a common bug that silently destroys accuracy for large trades.
+
+### Creator Fee
+
+1% of every trade (buy and sell) is sent directly to the token creator’s wallet. This fee comes **from the trader on top of the reserve cost**, so the invariant `balance = ∫ price ds` is never broken.
+
+-----
+
+## 🗂 Project Structure
+
+```
+curvepad/
+├── packages/
+│   ├── foundry/
+│   │   ├── contracts/
+│   │   │   └── TokenFactory.sol          ← TokenFactory + BondingCurveToken
+│   │   ├── script/
+│   │   │   └── DeployTokenFactory.s.sol  ← Forge deploy script
+│   │   └── test/
+│   │       └── TokenFactory.t.sol        ← 5 invariant tests
+│   │
+│   └── nextjs/
+│       ├── app/
+│       │   ├── page.tsx                  ← Explore: all tokens grid
+│       │   ├── create/
+│       │   │   └── page.tsx              ← Launch a new token
+│       │   └── token/[address]/
+│       │       └── page.tsx              ← Trade view per token
+│       ├── components/
+│       │   ├── BondingCurveChart.tsx     ← Pure Canvas price chart
+│       │   └── ActivityFeed.tsx          ← Live on-chain trade feed
+│       └── contracts/
+│           └── config.ts                 ← ABIs + deployed address
+│
+└── README.md
+```
+
+-----
+
+## 🖥 Frontend Pages
+
+### Explore (`/`)
+
+- Grid of all launched tokens with live price, market cap, symbol, and creator
+- Sortable by **Newest** or **Top Market Cap**
+- Full-text search across token names and symbols
+- Auto-refreshes every 15 seconds
+
+### Launch (`/create`)
+
+- Single form: name + symbol
+- One-click deploy via MetaMask / any EIP-1193 wallet
+- Shows curve parameters, fee structure, and launch cost before confirming
+- Redirects to the token trade page on success
+
+### Trade (`/token/[address]`)
+
+- **Hero bonding curve chart** — Canvas-rendered, no external charting library
+  - Plots price vs. supply for the full curve range
+  - Animates a **live position dot** at current supply
+  - Highlights the exact price range your pending trade would traverse in real time (blue = buy, red = sell)
+- Buy / sell panels with real-time ETH ↔ token estimates
+- Live stats: current price, total supply, market cap, ETH reserve, creator fees earned
+- **Activity feed** — auto-updating stream of on-chain `Trade` events with BaseScan links
+
+-----
+
+## 🧪 Test Suite
+
+Five invariant tests in `TokenFactory.t.sol`:
+
+|Test                             |What it checks                                              |
+|---------------------------------|------------------------------------------------------------|
+|`test_createToken`               |Factory deploys correctly, creator address stored           |
+|`test_buyReturnsNonTrivialTokens`|1 ETH buys a meaningful (non-zero, non-dust) amount         |
+|`test_reserveIntegrity`          |`address(this).balance` equals the curve integral after buys|
+|`test_sellRoundTrip`             |Sell returns ETH; buyer gets back ~96% (net of 2× 1% fees)  |
+|`test_priceIncreasesWithBuys`    |Spot price after buy is strictly greater than before        |
+
+Run them:
+
+```bash
+cd packages/foundry
+forge test -vv
+```
+
+-----
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Node.js ≥ 18](https://nodejs.org)
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
+- [Yarn](https://yarnpkg.com)
+- A Base mainnet RPC URL (e.g. from [Alchemy](https://alchemy.com) or [Infura](https://infura.io))
+- A [BaseScan API key](https://basescan.org/myapikey) for contract verification
+
+-----
+
+### 1. Scaffold the Project
+
+```bash
+npx create-eth@latest -s foundry curvepad
+cd curvepad
+```
+
+### 2. Drop In the CurvePad Files
+
+Replace the generated `packages/foundry/contracts/` and `packages/nextjs/app/` with the files from this repo.
+
+### 3. Install Dependencies
+
+```bash
+yarn install
+```
+
+### 4. Run Tests
+
+```bash
+cd packages/foundry
+forge test -vv
+```
+
+Expected output:
+
+```
+[PASS] test_createToken() (gas: 891234)
+[PASS] test_buyReturnsNonTrivialTokens() (gas: 1023456)
+[PASS] test_reserveIntegrity() (gas: 987654)
+[PASS] test_sellRoundTrip() (gas: 1134567)
+[PASS] test_priceIncreasesWithBuys() (gas: 876543)
+```
+
+### 5. Configure Environment
+
+Create `packages/foundry/.env`:
+
+```env
+DEPLOYER_PRIVATE_KEY=0x_your_private_key_here
+BASE_RPC_URL=https://mainnet.base.org
+BASESCAN_API_KEY=your_basescan_api_key
+```
+
+### 6. Deploy to Base Mainnet
+
+```bash
+cd packages/foundry
+
+forge script script/DeployTokenFactory.s.sol \
+  --rpc-url $BASE_RPC_URL \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $BASESCAN_API_KEY
+```
+
+Copy the deployed `TokenFactory` address from the output.
+
+### 7. Wire Up the Frontend
+
+Edit `packages/nextjs/contracts/config.ts`:
+
+```typescript
+export const FACTORY_ADDRESS = "0xYOUR_DEPLOYED_FACTORY_ADDRESS" as `0x${string}`;
+```
+
+### 8. Run the App
+
+```bash
+cd packages/nextjs
+yarn dev
+```
+
+Open <http://localhost:3000>.
+
+-----
+
+## 🔐 Security Design
+
+|Property             |Implementation                                                                  |
+|---------------------|--------------------------------------------------------------------------------|
+|Reentrancy protection|`ReentrancyGuard` on `buy()` and `sell()`                                       |
+|CEI pattern          |State updated (mint/burn) before any ETH transfer                               |
+|Reserve invariant    |Fees deducted from trader, not reserve — balance always equals integral         |
+|No admin keys        |`BondingCurveToken` is immutable post-deploy; no `owner`, no `pause`, no `drain`|
+|Integer overflow     |All math uses 256-bit arithmetic with explicit scaling; no unsafe casting       |
+|Precision in buy math|Discriminant computed at full precision before sqrt — no premature division     |
+|ETH transfer safety  |All ETH sends use `.call{value: ...}("")` with `require(ok)`                    |
+
+
+> **Disclaimer:** This code has not been audited by a third party. Use at your own risk. Do not deploy significant value without a professional audit.
+
+-----
+
+## 🗺 Roadmap
+
+- [x] Linear bonding curve with full integral pricing
+- [x] TokenFactory with on-chain registry
+- [x] Creator fee (1% per trade)
+- [x] Canvas-based live bonding curve chart
+- [x] Trade preview highlighting on curve
+- [x] Live on-chain activity feed
+- [ ] **Token metadata** — name, description, image stored on IPFS
+- [ ] **Graduation mechanic** — auto-deploy to Uniswap V3 when market cap hits threshold (pump.fun style)
+- [ ] **Curve options** — quadratic, sigmoid, exponential
+- [ ] **Per-token comment feed** — social layer on-chain
+- [ ] **Leaderboard** — top tokens by volume and market cap
+- [ ] **Referral system** — split creator fees with referrers
+
+-----
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
+
+1. Fork the repo under your account
+1. Create a branch: `git checkout -b feat/your-feature`
+1. Commit your changes: `git commit -m 'feat: add your feature'`
+1. Push: `git push origin feat/your-feature`
+1. Open a Pull Request against `main`
+
+-----
+
+## 📄 License
+
+[MIT](LICENSE) © 2025 [Agunnaya Labs](https://github.com/agunnaya001)
+
+-----
+
+<div align="center">
+
+Built by **[@agunnaya001](https://github.com/agunnaya001)** · **[Agunnaya Labs](https://github.com/agunnaya001)**
+
+[![Twitter](https://img.shields.io/badge/Follow%20on%20X-%40Agunnaya001-1DA1F2?style=for-the-badge&logo=x&labelColor=080B0F)](https://x.com/Agunnaya001)
+[![GitHub](https://img.shields.io/badge/GitHub-agunnaya001-181717?style=for-the-badge&logo=github&labelColor=080B0F)](https://github.com/agunnaya001)
+
+*Price is a function. Not a negotiation.*
+
+</div>

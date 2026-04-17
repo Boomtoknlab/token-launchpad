@@ -1,0 +1,25 @@
+uploads = []
+
+[[generated]]
+id = "a3FypNzJvw_xUXkCIj48h"
+uri = "file://attached_assets/curvepad-brand.png"
+type = "image"
+title = "curvepad neon green brand logo"
+
+[[generated]]
+id = "1ZD2jf4SEyhXr8q9gXNC7"
+uri = "file://attached_assets/curvepad-icon.png"
+type = "image"
+title = "curvepad icon square logo"
+
+[[outputs]]
+id = "yJE5kkK3qpK_xtoHopsm0"
+uri = "file://attached_assets/curvepad-brand.png"
+type = "image"
+title = "CurvePad Brand Banner (16:9)"
+
+[[outputs]]
+id = "eO_9VU9Ty8DMXyHgghG86"
+uri = "file://attached_assets/curvepad-icon.png"
+type = "image"
+title = "CurvePad Icon (Square)"

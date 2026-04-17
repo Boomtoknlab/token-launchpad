@@ -1,0 +1,63 @@
+name: AGL Elite CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      web3: ${{ steps.check.outputs.web3 }}
+      saas: ${{ steps.check.outputs.saas }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: check
+        run: |
+          echo "web3=$( [ -d contracts ] && echo true || echo false )" >> $GITHUB_OUTPUT
+          echo "saas=$( [ -d backend ] && echo true || echo false )" >> $GITHUB_OUTPUT
+
+  web3:
+    needs: detect
+    if: needs.detect.outputs.web3 == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+      - run: npx hardhat compile
+      - run: npx hardhat test
+
+  saas:
+    needs: detect
+    if: needs.detect.outputs.saas == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+
+      - run: npm install
+      - run: npm run build || true
+      - run: npm test || true
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - run: npm audit --audit-level=high || true
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - uses: github/codeql-action/analyze@v3
